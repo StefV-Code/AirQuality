@@ -1,0 +1,38 @@
+# Zet dit bestand in je repo op:  .github/workflows/pm10-poller.yml
+name: PM10 poller
+
+on:
+  schedule:
+    - cron: "15 * * * *"   # elk uur om :15 (UTC)
+  workflow_dispatch:        # knop om manueel te starten (handig om te testen)
+
+permissions:
+  contents: write           # nodig om de nieuwe data te committen
+
+concurrency:
+  group: pm10-poller        # nooit twee runs tegelijk
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Data ophalen
+        run: python pm10_poller.py
+        env:
+          PM10_BASE: ${{ github.workspace }}
+
+      - name: Nieuwe data committen
+        run: |
+          git config user.name "pm10-bot"
+          git config user.email "pm10-bot@users.noreply.github.com"
+          git add data
+          git diff --cached --quiet || git commit -m "PM10 data $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push
